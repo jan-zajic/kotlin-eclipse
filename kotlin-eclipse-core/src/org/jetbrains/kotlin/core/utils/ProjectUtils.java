@@ -112,7 +112,7 @@ public class ProjectUtils {
         }
     }
     
-    public static void cleanFolder(IContainer container) throws CoreException {
+    public static void cleanFolder(IContainer container) {
         cleanFolder(container, getAlwaysTrue());
     }
     
@@ -171,6 +171,16 @@ public class ProjectUtils {
     public static List<File> collectClasspathWithDependenciesForBuild(@NotNull IJavaProject javaProject)
             throws JavaModelException {
         return expandClasspath(javaProject, true, false, new Function1<IClasspathEntry, Boolean>() {
+            @Override
+            public Boolean invoke(IClasspathEntry entry) {
+                return true;
+            }
+        });
+    }
+    
+    public static List<File> collectClasspathWithDependenciesForFullBuild(@NotNull IJavaProject javaProject) 
+            throws JavaModelException {
+        return expandClasspath(javaProject, true, true, new Function1<IClasspathEntry, Boolean>() {
             @Override
             public Boolean invoke(IClasspathEntry entry) {
                 return true;

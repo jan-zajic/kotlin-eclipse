@@ -46,7 +46,7 @@ public class KotlinCompiler {
     }
     
     @NotNull
-    public KotlinCompilerResult compileKotlinFiles(@NotNull IJavaProject javaProject) 
+    public KotlinCompilerResult compileKotlinFiles(@NotNull IJavaProject javaProject, @NotNull KotlinCompilerArguments arguments) 
             throws CoreException {
         IFolder outputFolder = ProjectUtils.getOutputFolder(javaProject);
         if (outputFolder == null) {
@@ -54,9 +54,9 @@ public class KotlinCompiler {
             return KotlinCompilerResult.EMPTY;
         }
         
-        String[] arguments = configureCompilerArguments(javaProject, outputFolder.getLocation().toOSString());
+        String[] commandLineArguments = configureCompilerArguments(javaProject, arguments, outputFolder.getLocation().toOSString());
         
-        return execKotlinCompiler(arguments);
+        return execKotlinCompiler(commandLineArguments);
     }
     
     public KotlinCompilerResult execKotlinCompiler(@NotNull String[] arguments) {
@@ -69,18 +69,25 @@ public class KotlinCompiler {
         return parseCompilerOutput(reader);
     }
     
-    private String[] configureCompilerArguments(@NotNull IJavaProject javaProject, @NotNull String outputDir) throws CoreException {
+    private String[] configureCompilerArguments(@NotNull IJavaProject javaProject, @NotNull KotlinCompilerArguments arguments, @NotNull String outputDir) throws CoreException {
         List<String> command = new ArrayList<String>();
+        //see K2JVMCompilerArguments.java
         command.add("-kotlin-home");
         command.add(ProjectUtils.KT_HOME);
         command.add("-no-jdk");
         command.add("-no-stdlib"); // Because we add runtime into the classpath
-        
+      
         StringBuilder classPath = new StringBuilder();
         String pathSeparator = System.getProperty("path.separator");
         
-        for (File file : ProjectUtils.collectClasspathWithDependenciesForLaunch(javaProject)) {
-            classPath.append(file.getAbsolutePath()).append(pathSeparator);
+        if(arguments.launch) {
+            for (File file : ProjectUtils.collectClasspathWithDependenciesForLaunch(javaProject)) {
+                classPath.append(file.getAbsolutePath()).append(pathSeparator);
+            }
+        } else {
+            for (File file : ProjectUtils.collectClasspathWithDependenciesForFullBuild(javaProject)) {
+                classPath.append(file.getAbsolutePath()).append(pathSeparator);
+            }
         }
         
         command.add("-classpath");
@@ -157,4 +164,27 @@ public class KotlinCompiler {
             return compilerOutput;
         }
     }
+    
+    public static class KotlinCompilerArguments {
+        private boolean launch = true;
+        
+        private KotlinCompilerArguments() {
+        }
+        
+        public boolean isLaunch() {
+            return launch;
+        }
+        
+        public static KotlinCompilerArguments run() {
+            return new KotlinCompilerArguments();
+        }
+        
+        public static KotlinCompilerArguments fullBuild() {
+            KotlinCompilerArguments args = new KotlinCompilerArguments();
+            args.launch = false;
+            return args;
+        }
+       
+    }
+    
 }
