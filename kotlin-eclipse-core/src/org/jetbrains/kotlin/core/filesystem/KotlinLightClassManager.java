@@ -4,7 +4,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,7 +52,7 @@ public class KotlinLightClassManager {
     
     private final IProject project;
     
-    private final ConcurrentMap<File, Set<IFile>> sourceFiles = new ConcurrentHashMap<>();
+    private final ConcurrentMap<File, SourceFilesEntry> sourceFiles = new ConcurrentHashMap<>();
     
     @NotNull
     public static KotlinLightClassManager getInstance(@NotNull IProject project) {
@@ -82,17 +81,19 @@ public class KotlinLightClassManager {
     }
     
     public void computeLightClassesSources() {
-        Map<File, Set<IFile>> newSourceFilesMap = new HashMap<>();
+        Map<File, SourceFilesEntry> newSourceFilesMap = new HashMap<>();
         for (IFile sourceFile : KotlinPsiManager.INSTANCE.getFilesByProject(project)) {
             List<IPath> lightClassesPaths = getLightClassesPaths(sourceFile);
             
             for (IPath path : lightClassesPaths) {
                 LightClassFile lightClassFile = new LightClassFile(project.getFile(path));
+                File asFile = lightClassFile.asFile();
                 
-                Set<IFile> newSourceFiles = newSourceFilesMap.get(lightClassFile.asFile());
+                SourceFilesEntry newSourceFiles = newSourceFilesMap.get(asFile);
                 if (newSourceFiles == null) {
-                    newSourceFiles = new HashSet<>();
-                    newSourceFilesMap.put(lightClassFile.asFile(), newSourceFiles);
+                    newSourceFiles = new SourceFilesEntry();                                        
+                    newSourceFilesMap.put(asFile, newSourceFiles);
+                    newSourceFilesMap.put(lightClassFile.getResource().getLocation().toFile(), new SourceFilesEntry(newSourceFiles));
                 }
                 newSourceFiles.add(sourceFile);
             }
@@ -103,7 +104,9 @@ public class KotlinLightClassManager {
     }
     
     public void updateLightClasses(@NotNull Set<IFile> affectedFiles) {
-        for (Map.Entry<File, Set<IFile>> entry : sourceFiles.entrySet()) {
+        for (Map.Entry<File, SourceFilesEntry> entry : sourceFiles.entrySet()) {
+            if(entry.getValue().isAlias())
+                continue;
             IFile lightClassIFile = ResourcesPlugin.getWorkspace().getRoot().getFile(new Path(entry.getKey().getPath()));
             if (lightClassIFile == null) continue;
             
@@ -154,7 +157,9 @@ public class KotlinLightClassManager {
     
     @NotNull
     private List<KtFile> getSourceKtFiles(@NotNull File lightClass) {
-        Set<IFile> sourceIOFiles = sourceFiles.get(lightClass);
+        SourceFilesEntry sourceIOFiles = sourceFiles.get(lightClass);
+        if(sourceIOFiles == null)
+            sourceIOFiles = sourceFiles.get(lightClass.getAbsoluteFile());
         if (sourceIOFiles != null) {
             List<KtFile> jetSourceFiles = new ArrayList<>();
             for (IFile sourceFile : sourceIOFiles) {
@@ -235,7 +240,7 @@ public class KotlinLightClassManager {
                 if (resource instanceof IFile) {
                     IFile eclipseFile = (IFile) resource;
                     LightClassFile lightClass = new LightClassFile(eclipseFile);
-                    Set<IFile> sources = sourceFiles.get(lightClass.asFile());
+                    SourceFilesEntry sources = sourceFiles.get(lightClass.asFile());
                     
                     boolean dropLightClass = sources != null ? sources.isEmpty() : true;
                     if (dropLightClass) {
