@@ -123,6 +123,11 @@ public class KotlinLightClassManager {
         
         cleanOutdatedLightClasses(project);
     }
+
+    public void cleanLightClasses() {
+        ProjectUtils.cleanFolder(KotlinJavaManager.INSTANCE.getKotlinBinFolderFor(project));
+        cachedLightClasses.flush();
+    }
     
     public List<KtFile> getSourceFiles(@NotNull File file) {
         if (sourceFiles.isEmpty()) {

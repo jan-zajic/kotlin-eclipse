@@ -39,6 +39,11 @@ object KotlinLightClassGeneration {
         KotlinLightClassManager.getInstance(project).computeLightClassesSources()
         KotlinLightClassManager.getInstance(project).updateLightClasses(affectedFiles)
     }
+
+    fun cleanLightClasses(project: IProject) {
+        if (!KotlinJavaManager.hasLinkedKotlinBinFolder(project)) return
+        KotlinLightClassManager.getInstance(project).cleanLightClasses()
+    }
     
     fun buildLightClasses(
             analysisResult: AnalysisResult, 

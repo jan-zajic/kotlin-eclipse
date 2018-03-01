@@ -23,13 +23,14 @@ import org.eclipse.debug.core.IStatusHandler;
 import org.eclipse.jdt.core.IJavaProject;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.core.Activator;
+import org.jetbrains.kotlin.core.compiler.KotlinCompiler.KotlinCompilerArguments;
 import org.jetbrains.kotlin.core.compiler.KotlinCompiler.KotlinCompilerResult;
 import org.jetbrains.kotlin.core.launch.CompilerOutputData;
 
 public class KotlinCompilerUtils {
     @NotNull
-    public static KotlinCompilerResult compileWholeProject(@NotNull IJavaProject javaProject) throws CoreException {
-        return KotlinCompiler.INSTANCE.compileKotlinFiles(javaProject);
+    public static KotlinCompilerResult compileWholeProject(@NotNull IJavaProject javaProject, KotlinCompilerArguments args) throws CoreException {
+        return KotlinCompiler.INSTANCE.compileKotlinFiles(javaProject, args);        
     }
     
     public static void handleCompilerOutput(@NotNull CompilerOutputData compilerOutput) throws CoreException {
