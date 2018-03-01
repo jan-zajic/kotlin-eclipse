@@ -15,12 +15,7 @@
  *******************************************************************************/
 package org.jetbrains.kotlin.core.compiler;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.PrintStream;
-import java.io.Reader;
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,13 +24,14 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.jdt.core.IJavaProject;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.kotlin.cli.common.ExitCode;
+import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation;
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler;
+import org.jetbrains.kotlin.config.Services;
 import org.jetbrains.kotlin.core.launch.CompilerOutputData;
-import org.jetbrains.kotlin.core.launch.CompilerOutputParser;
-import org.jetbrains.kotlin.core.launch.KotlinCLICompiler;
 import org.jetbrains.kotlin.core.log.KotlinLogger;
 import org.jetbrains.kotlin.core.utils.ProjectUtils;
 
@@ -46,41 +42,67 @@ public class KotlinCompiler {
     }
     
     @NotNull
-    public KotlinCompilerResult compileKotlinFiles(@NotNull IJavaProject javaProject, @NotNull KotlinCompilerArguments arguments) 
-            throws CoreException {
+    public KotlinCompilerResult compileKotlinFiles(@NotNull IJavaProject javaProject,
+            @NotNull KotlinCompilerArguments arguments) throws CoreException {
         IFolder outputFolder = ProjectUtils.getOutputFolder(javaProject);
         if (outputFolder == null) {
             KotlinLogger.logError("There is no output folder for project: " + javaProject, null);
             return KotlinCompilerResult.EMPTY;
         }
         
-        String[] commandLineArguments = configureCompilerArguments(javaProject, arguments, outputFolder.getLocation().toOSString());
+        K2JVMCompilerArguments commandLineArguments = configureCompilerArguments(javaProject, arguments,
+                outputFolder.getLocation().toOSString());
         
         return execKotlinCompiler(commandLineArguments);
     }
     
-    public KotlinCompilerResult execKotlinCompiler(@NotNull String[] arguments) {
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        PrintStream out = new PrintStream(outputStream);
+    public KotlinCompilerResult execKotlinCompiler(K2JVMCompilerArguments arguments) {
+        final CompilerOutputData compilerOutput = new CompilerOutputData();
+        final List<CompilerMessageSeverity> severities = new ArrayList<CompilerMessageSeverity>();
         
-        KotlinCLICompiler.doMain(new K2JVMCompiler(), out, arguments);
+        ExitCode exitCode = execKotlinCompiler(new MessageCollector() {
+            private boolean hasErrors = false;
+            
+            @Override
+            public void report(@NotNull CompilerMessageSeverity messageSeverity, @NotNull String message,
+                    @Nullable CompilerMessageLocation messageLocation) {
+                hasErrors = hasErrors || messageSeverity.isError();
+                severities.add(messageSeverity);
+                compilerOutput.add(messageSeverity, message, messageLocation);
+            }
+            
+            @Override
+            public boolean hasErrors() {
+                return hasErrors;
+            }
+            
+            @Override
+            public void clear() {
+                hasErrors = false;
+                
+            }
+        }, arguments);
         
-        BufferedReader reader = new BufferedReader(new StringReader(outputStream.toString()));
-        return parseCompilerOutput(reader);
+        return new KotlinCompilerResult(exitCode, compilerOutput);
     }
     
-    private String[] configureCompilerArguments(@NotNull IJavaProject javaProject, @NotNull KotlinCompilerArguments arguments, @NotNull String outputDir) throws CoreException {
-        List<String> command = new ArrayList<String>();
-        //see K2JVMCompilerArguments.java
-        command.add("-kotlin-home");
-        command.add(ProjectUtils.KT_HOME);
-        command.add("-no-jdk");
-        command.add("-no-stdlib"); // Because we add runtime into the classpath
-      
+    public ExitCode execKotlinCompiler(MessageCollector messageCollector, K2JVMCompilerArguments arguments) {
+        return new K2JVMCompiler().exec(messageCollector, Services.EMPTY, arguments);
+    }
+    
+    @NotNull
+    private K2JVMCompilerArguments configureCompilerArguments(@NotNull IJavaProject javaProject,
+            @NotNull KotlinCompilerArguments arguments, @NotNull String outputDir) throws CoreException {
+        K2JVMCompilerArguments command = new K2JVMCompilerArguments();
+        // see K2JVMCompilerArguments.java
+        command.setKotlinHome(ProjectUtils.KT_HOME);
+        command.setNoJdk(true);
+        command.setNoStdlib(true); // Because we add runtime into the classpath
+        
         StringBuilder classPath = new StringBuilder();
         String pathSeparator = System.getProperty("path.separator");
         
-        if(arguments.launch) {
+        if (arguments.launch) {
             for (File file : ProjectUtils.collectClasspathWithDependenciesForLaunch(javaProject)) {
                 classPath.append(file.getAbsolutePath()).append(pathSeparator);
             }
@@ -90,73 +112,29 @@ public class KotlinCompiler {
             }
         }
         
-        command.add("-classpath");
-        command.add(classPath.toString());
-        
-        command.add("-d");
-        command.add(outputDir);
+        command.setClasspath(classPath.toString());
+        command.setDestination(outputDir);
         
         for (File srcDirectory : ProjectUtils.getSrcDirectories(javaProject)) {
-            command.add(srcDirectory.getAbsolutePath());
+            command.getFreeArgs().add(srcDirectory.getAbsolutePath());
         }
         
-        return command.toArray(new String[command.size()]);
+        return command;
     }
-
-    @NotNull
-    private KotlinCompilerResult parseCompilerOutput(Reader reader) {
-        final CompilerOutputData compilerOutput = new CompilerOutputData(); 
-        
-        final List<CompilerMessageSeverity> severities = new ArrayList<CompilerMessageSeverity>();
-        CompilerOutputParser.parseCompilerMessagesFromReader(
-                new MessageCollector() {
-                    private boolean hasErrors = false;
-                    
-                    @Override
-                    public void report(@NotNull CompilerMessageSeverity messageSeverity, @NotNull String message,
-                            @Nullable CompilerMessageLocation messageLocation) {
-                        hasErrors = hasErrors || messageSeverity.isError();
-                        severities.add(messageSeverity);
-                        compilerOutput.add(messageSeverity, message, messageLocation);
-                    }
-
-                    @Override
-                    public boolean hasErrors() {
-                        return hasErrors;
-                    }
-
-                    @Override
-                    public void clear() {
-                        hasErrors = false;
-                        
-                    }
-                },
-                reader);
-        
-        boolean result = true;
-        for (CompilerMessageSeverity severity : severities) {
-            if (severity.equals(CompilerMessageSeverity.ERROR) || severity.equals(CompilerMessageSeverity.EXCEPTION)) {
-                result = false;
-                break;
-            }
-        }
-        
-        return new KotlinCompilerResult(result, compilerOutput);
-    }
-    
+  
     public static class KotlinCompilerResult {
-        public static KotlinCompilerResult EMPTY = new KotlinCompilerResult(false, new CompilerOutputData());
+        public static KotlinCompilerResult EMPTY = new KotlinCompilerResult(ExitCode.INTERNAL_ERROR, new CompilerOutputData());
         
-        private final boolean result;
+        private final ExitCode result;
         private final CompilerOutputData compilerOutput;
         
-        private KotlinCompilerResult(boolean result, @NotNull CompilerOutputData compilerOutput) {
-            this.result = result;
+        private KotlinCompilerResult(ExitCode exitCode, @NotNull CompilerOutputData compilerOutput) {
+            this.result = exitCode;
             this.compilerOutput = compilerOutput;
         }
         
         public boolean compiledCorrectly() {
-            return result;
+            return result == ExitCode.OK;
         }
         
         @NotNull
@@ -167,7 +145,7 @@ public class KotlinCompiler {
     
     public static class KotlinCompilerArguments {
         private boolean launch = true;
-        
+                
         private KotlinCompilerArguments() {
         }
         
