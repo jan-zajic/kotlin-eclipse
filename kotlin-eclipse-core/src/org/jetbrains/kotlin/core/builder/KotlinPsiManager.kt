@@ -48,6 +48,7 @@ import java.io.File
 import java.util.Collections
 import java.util.HashSet
 import java.util.concurrent.ConcurrentHashMap
+import com.intellij.psi.PsiFile
 
 interface PsiFilesStorage {
     fun getPsiFile(eclipseFile: IFile): KtFile
@@ -389,4 +390,5 @@ object KotlinPsiManager {
     fun commitFile(file: IFile, document: IDocument) {
         getKotlinFileIfExist(file, document.get())
     }
+	
 }

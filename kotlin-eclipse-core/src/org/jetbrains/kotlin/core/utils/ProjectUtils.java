@@ -198,6 +198,16 @@ public class ProjectUtils {
         });
     }
     
+    public static List<File> collectClasspathWithDependenciesForIncrementalBuild(@NotNull IJavaProject javaProject)
+            throws JavaModelException {
+        return expandClasspath(javaProject, true, true, new Function1<IClasspathEntry, Boolean>() {
+            @Override
+            public Boolean invoke(IClasspathEntry entry) {
+                return entry.getEntryKind() != IClasspathEntry.CPE_SOURCE;
+            }
+        });
+    }
+    
     @NotNull
     public static List<File> expandClasspath(@NotNull IJavaProject javaProject, boolean includeDependencies,
             boolean includeBinFolders, @NotNull Function1<IClasspathEntry, Boolean> entryPredicate) throws JavaModelException {
@@ -397,4 +407,5 @@ public class ProjectUtils {
         
         return null;
     }
+
 }

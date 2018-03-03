@@ -33,8 +33,8 @@ import org.eclipse.ui.PlatformUI
 import org.jetbrains.kotlin.core.asJava.KotlinLightClassGeneration
 import org.jetbrains.kotlin.core.builder.KotlinPsiManager
 import org.jetbrains.kotlin.core.compiler.KotlinCompiler.KotlinCompilerArguments
-import org.jetbrains.kotlin.core.compiler.KotlinCompiler.KotlinCompilerResult
 import org.jetbrains.kotlin.core.compiler.KotlinCompilerUtils
+import org.jetbrains.kotlin.core.model.KotlinJavaManager
 import org.jetbrains.kotlin.core.model.KotlinScriptEnvironment
 import org.jetbrains.kotlin.core.model.runJob
 import org.jetbrains.kotlin.core.resolve.KotlinAnalyzer
@@ -101,11 +101,26 @@ class KotlinBuilder : IncrementalProjectBuilder() {
         runCancellableAnalysisFor(javaProject) { analysisResult ->
             val projectFiles = KotlinPsiManager.getFilesByProject(javaProject.project)
             updateLineMarkers(analysisResult.bindingContext.diagnostics, (projectFiles - existingAffectedFiles).toList())
+			if(!analysisResult.isError()) {
+				val cachesDir = getCachesDir(javaProject)				
+				val compilerResult = KotlinCompilerUtils.compileWholeProject(javaProject, KotlinCompilerArguments.incrementalBuild(cachesDir))
+		        if (!compilerResult.compiledCorrectly()) {
+		            KotlinCompilerUtils.handleCompilerOutput(compilerResult.getCompilerOutput())
+		        } 				
+			}
         }
         
         return null
     }
     
+	private fun getCachesDir(javaProject: IJavaProject) : java.io.File {
+		val ifile = KotlinJavaManager.getKotlinCacheFolderFor(javaProject.getProject());
+		if(!ifile.exists()) {
+			ifile.create(false, true, null)
+		}
+		return ifile.getLocation().toFile();
+	}
+	
     override fun clean(monitor : IProgressMonitor) {
         val currentProject = getProject();
         if (currentProject == null || !currentProject.isAccessible()) return;

@@ -53,8 +53,12 @@ import org.jetbrains.kotlin.psi.KtPrimaryConstructor
 public object KotlinJavaManager {
     @JvmField
     public val KOTLIN_BIN_FOLDER: Path = Path("kotlin_bin")
+	@JvmField
+    public val KOTLIN_CACHE_FOLDER: Path = Path("kotlin_cache")
     
     public fun getKotlinBinFolderFor(project: IProject): IFolder = project.getFolder(KOTLIN_BIN_FOLDER)
+	
+	public fun getKotlinCacheFolderFor(project: IProject): IFolder = project.getFolder(KOTLIN_CACHE_FOLDER)
     
     public fun findEclipseType(jetClass: KtClassOrObject, javaProject: IJavaProject): IType? {
         return jetClass.getFqName().let {

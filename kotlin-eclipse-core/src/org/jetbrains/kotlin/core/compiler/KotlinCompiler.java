@@ -21,19 +21,22 @@ import java.util.List;
 
 import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.IJavaProject;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.cli.common.ExitCode;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
-import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation;
-import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler;
 import org.jetbrains.kotlin.config.Services;
 import org.jetbrains.kotlin.core.launch.CompilerOutputData;
 import org.jetbrains.kotlin.core.log.KotlinLogger;
+import org.jetbrains.kotlin.core.model.KotlinEnvironmentKt;
 import org.jetbrains.kotlin.core.utils.ProjectUtils;
+import org.jetbrains.kotlin.incremental.eclipse.IncrementalEclipseJvmCompilerRunnerKt;
+
+import com.intellij.openapi.extensions.Extensions;
+import com.intellij.openapi.extensions.ExtensionsArea;
 
 public class KotlinCompiler {
     public final static KotlinCompiler INSTANCE = new KotlinCompiler();
@@ -49,41 +52,59 @@ public class KotlinCompiler {
             KotlinLogger.logError("There is no output folder for project: " + javaProject, null);
             return KotlinCompilerResult.EMPTY;
         }
-        
+        System.setProperty("java.awt.headless", "true");
         K2JVMCompilerArguments commandLineArguments = configureCompilerArguments(javaProject, arguments,
-                outputFolder.getLocation().toOSString());
-        
-        return execKotlinCompiler(commandLineArguments);
+                outputFolder.getLocation().toOSString());        
+        if (arguments.isIncremental()) {
+            return runIncrementalCompiler(javaProject, arguments.getCachesDir(), commandLineArguments);
+        } else {
+            return execKotlinCompiler(commandLineArguments);
+        }
     }
     
+    private KotlinCompilerResult runIncrementalCompiler(IJavaProject javaProject, File cachesDir, K2JVMCompilerArguments commandLineArguments) throws CoreException {
+        KotlinLogger.logWarning("Using experimental Kotlin incremental compilation");
+        EclipseICReporter icReporter = EclipseICReporter.get(javaProject, EclipseICReporter.IC_LOG_LEVEL_WARNING);
+        EclipseMessageCollector messageCollector = new EclipseMessageCollector();
+        String destination = commandLineArguments.getDestination();
+        File classesDir = new File(destination);
+        File kotlinClassesDir = new File(cachesDir, "classes");        
+        File snapshotsFile = new File(cachesDir, "snapshots.bin");
+        ExtensionsArea rootArea = Extensions.getRootArea();
+        try {
+            commandLineArguments.setDestination(kotlinClassesDir.getAbsolutePath());
+            //https://github.com/JetBrains/kotlin/blob/1dadf84c40ccc30b8312f40194d1a13b6da1d203/libraries/tools/kotlin-maven-plugin/src/main/java/org/jetbrains/kotlin/maven/K2JVMCompileMojo.java
+            IncrementalEclipseJvmCompilerRunnerKt.makeEclipseIncrementally(cachesDir, getSourceRoots(javaProject), commandLineArguments, messageCollector, icReporter);            
+            KotlinLogger.logInfo("Compiled " + icReporter.getCompiledKotlinFiles().size() + " Kotlin files using incremental compiler");
+        } catch (Throwable t) {
+            t.printStackTrace();
+            return new KotlinCompilerResult(ExitCode.INTERNAL_ERROR, messageCollector.getCompilerOutput());
+        }
+        
+        ExitCode exitCode;
+        if (messageCollector.hasErrors()) {
+            exitCode =  ExitCode.COMPILATION_ERROR;
+        } else {
+            (new FileCopier()).syncDirs(kotlinClassesDir, classesDir, snapshotsFile);
+            exitCode = ExitCode.OK;
+        }
+        return new KotlinCompilerResult(exitCode, messageCollector.getCompilerOutput());
+    }
+    
+    private Iterable<? extends File> getSourceRoots(IJavaProject javaProject) throws CoreException {
+        List<File> sourceList = new ArrayList<>();
+        for (IClasspathEntry classpathEntry : javaProject.getResolvedClasspath(true)) {
+            if (classpathEntry.getEntryKind() == IClasspathEntry.CPE_SOURCE) {
+                sourceList.addAll(ProjectUtils.getFileByEntry(classpathEntry, javaProject));
+            }
+        }
+        return sourceList;
+    }
+
     public KotlinCompilerResult execKotlinCompiler(K2JVMCompilerArguments arguments) {
-        final CompilerOutputData compilerOutput = new CompilerOutputData();
-        final List<CompilerMessageSeverity> severities = new ArrayList<CompilerMessageSeverity>();
-        
-        ExitCode exitCode = execKotlinCompiler(new MessageCollector() {
-            private boolean hasErrors = false;
-            
-            @Override
-            public void report(@NotNull CompilerMessageSeverity messageSeverity, @NotNull String message,
-                    @Nullable CompilerMessageLocation messageLocation) {
-                hasErrors = hasErrors || messageSeverity.isError();
-                severities.add(messageSeverity);
-                compilerOutput.add(messageSeverity, message, messageLocation);
-            }
-            
-            @Override
-            public boolean hasErrors() {
-                return hasErrors;
-            }
-            
-            @Override
-            public void clear() {
-                hasErrors = false;
-                
-            }
-        }, arguments);
-        
-        return new KotlinCompilerResult(exitCode, compilerOutput);
+        EclipseMessageCollector messageCollector = new EclipseMessageCollector();
+        ExitCode exitCode = execKotlinCompiler(messageCollector, arguments);
+        return new KotlinCompilerResult(exitCode, messageCollector.getCompilerOutput());
     }
     
     public ExitCode execKotlinCompiler(MessageCollector messageCollector, K2JVMCompilerArguments arguments) {
@@ -93,11 +114,12 @@ public class KotlinCompiler {
     @NotNull
     private K2JVMCompilerArguments configureCompilerArguments(@NotNull IJavaProject javaProject,
             @NotNull KotlinCompilerArguments arguments, @NotNull String outputDir) throws CoreException {
-        K2JVMCompilerArguments command = new K2JVMCompilerArguments();
+        K2JVMCompilerArguments args = new K2JVMCompilerArguments();
         // see K2JVMCompilerArguments.java
-        command.setKotlinHome(ProjectUtils.KT_HOME);
-        command.setNoJdk(true);
-        command.setNoStdlib(true); // Because we add runtime into the classpath
+        args.setKotlinHome(ProjectUtils.KT_HOME);
+        args.setNoJdk(true);
+        args.setNoStdlib(true); // Because we add runtime into the classpath
+        args.setModuleName("");
         
         StringBuilder classPath = new StringBuilder();
         String pathSeparator = System.getProperty("path.separator");
@@ -106,24 +128,31 @@ public class KotlinCompiler {
             for (File file : ProjectUtils.collectClasspathWithDependenciesForLaunch(javaProject)) {
                 classPath.append(file.getAbsolutePath()).append(pathSeparator);
             }
+        } else if(arguments.incremental) {
+            for (File file : ProjectUtils.collectClasspathWithDependenciesForIncrementalBuild(javaProject)) {
+                classPath.append(file.getAbsolutePath()).append(pathSeparator);
+            }
         } else {
             for (File file : ProjectUtils.collectClasspathWithDependenciesForFullBuild(javaProject)) {
                 classPath.append(file.getAbsolutePath()).append(pathSeparator);
             }
         }
         
-        command.setClasspath(classPath.toString());
-        command.setDestination(outputDir);
+        args.setClasspath(classPath.toString());
+        args.setDestination(outputDir);
         
         for (File srcDirectory : ProjectUtils.getSrcDirectories(javaProject)) {
-            command.getFreeArgs().add(srcDirectory.getAbsolutePath());
+            args.getFreeArgs().add(srcDirectory.getAbsolutePath());
         }
         
-        return command;
+        args.setIntellijPluginRoot(KotlinEnvironmentKt.getKOTLIN_COMPILER_PATH());        
+        
+        return args;
     }
-  
+    
     public static class KotlinCompilerResult {
-        public static KotlinCompilerResult EMPTY = new KotlinCompilerResult(ExitCode.INTERNAL_ERROR, new CompilerOutputData());
+        public static KotlinCompilerResult EMPTY = new KotlinCompilerResult(ExitCode.INTERNAL_ERROR,
+                new CompilerOutputData());
         
         private final ExitCode result;
         private final CompilerOutputData compilerOutput;
@@ -145,12 +174,22 @@ public class KotlinCompiler {
     
     public static class KotlinCompilerArguments {
         private boolean launch = true;
-                
+        private boolean incremental = false;
+        private File cachesDir;
+        
         private KotlinCompilerArguments() {
         }
         
+        public File getCachesDir() {
+            return cachesDir;
+        }
+
         public boolean isLaunch() {
             return launch;
+        }
+        
+        public boolean isIncremental() {
+            return incremental;
         }
         
         public static KotlinCompilerArguments run() {
@@ -160,9 +199,18 @@ public class KotlinCompiler {
         public static KotlinCompilerArguments fullBuild() {
             KotlinCompilerArguments args = new KotlinCompilerArguments();
             args.launch = false;
+            args.incremental = false;
             return args;
         }
-       
+        
+        public static KotlinCompilerArguments incrementalBuild(File cachesDir) {
+            KotlinCompilerArguments args = new KotlinCompilerArguments();
+            args.launch = false;
+            args.incremental = true;
+            args.cachesDir = cachesDir;
+            return args;
+        }
+        
     }
     
 }

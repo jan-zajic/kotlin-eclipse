@@ -40,5 +40,6 @@ Export-Package: org.jetbrains.kotlin.core,
  org.jetbrains.kotlin.core.resolve.lang.java.resolver,
  org.jetbrains.kotlin.core.resolve.lang.java.structure,
  org.jetbrains.kotlin.core.resolve.lang.kotlin,
- org.jetbrains.kotlin.core.utils
+ org.jetbrains.kotlin.core.utils,
+ org.jetbrains.kotlin.incremental.eclipse
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
