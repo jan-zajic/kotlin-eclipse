@@ -16,34 +16,58 @@
  *******************************************************************************/
 package org.jetbrains.kotlin.preferences;
 
-import org.eclipse.jface.preference.PreferencePage;
+import org.eclipse.jface.preference.ComboFieldEditor;
+import org.eclipse.jface.preference.FieldEditorPreferencePage;
 import org.eclipse.jface.resource.ImageDescriptor;
-import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Control;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchPreferencePage;
+import org.jetbrains.kotlin.ui.Activator;
 
-public class KotlinPreferencePage extends PreferencePage implements IWorkbenchPreferencePage {
+public class KotlinPreferencePage extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
+
+    public static final String SHOW_COMPILER_CONSOLE = "kotlin.show.console";
 
     public KotlinPreferencePage() {
     }
 
-    public KotlinPreferencePage(String title) {
-        super(title);
+    public KotlinPreferencePage(int style) {
+        super(style);
     }
 
-    public KotlinPreferencePage(String title, ImageDescriptor image) {
-        super(title, image);
+    public KotlinPreferencePage(String title, ImageDescriptor image, int style) {
+        super(title, image, style);
+    }
+    
+    public KotlinPreferencePage(String title, int style) {
+        super(title, style);
     }
 
     @Override
     public void init(IWorkbench workbench) {
-
+     // Set the preference store for the preference page. 
+     setPreferenceStore(Activator.getDefault().getPreferenceStore());
     }
 
     @Override
-    protected Control createContents(Composite parent) {
-        return null;
+    protected void createFieldEditors() {
+        ComboFieldEditor consoleEditor = new ComboFieldEditor(SHOW_COMPILER_CONSOLE, "Show console", createConsoleOptions(), getFieldEditorParent());
+        addField(consoleEditor);
     }
 
+    private String[][] createConsoleOptions() {
+        String[][] options = new String[ConsoleMode.values().length][2];
+        for (int i = 0; i < ConsoleMode.values().length; i++) {
+            ConsoleMode consoleMode = ConsoleMode.values()[i];
+            options[i][0] = consoleMode.name();
+            options[i][1] = consoleMode.name();
+        }
+        return options;
+    }
+
+    @Override
+    protected void performDefaults() {
+        //see KotlinPreferenceInitializer
+        super.performDefaults();        
+    }
+    
 }

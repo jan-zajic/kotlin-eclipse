@@ -24,6 +24,7 @@ import java.util.Map;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.debug.core.IStatusHandler;
+import org.eclipse.jface.preference.IPreferenceStore;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.RGB;
 import org.eclipse.ui.console.ConsolePlugin;
@@ -33,6 +34,9 @@ import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation;
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity;
 import org.jetbrains.kotlin.core.launch.CompilerOutputData;
 import org.jetbrains.kotlin.core.launch.CompilerOutputElement;
+import org.jetbrains.kotlin.preferences.ConsoleMode;
+import org.jetbrains.kotlin.preferences.KotlinPreferencePage;
+import org.jetbrains.kotlin.ui.Activator;
 
 public class CompilerStatusHandler implements IStatusHandler {
     
@@ -48,16 +52,24 @@ public class CompilerStatusHandler implements IStatusHandler {
             return null;
         }
         
+        IPreferenceStore preferenceStore = Activator.getDefault().getPreferenceStore();
+        String consolePref = preferenceStore.getString(KotlinPreferencePage.SHOW_COMPILER_CONSOLE);
+        ConsoleMode mode = ConsoleMode.valueOf(consolePref);
+                
         List<CompilerOutputElement> outputDataList = ((CompilerOutputData) source).getList(); 
         
         Map<String, List<CompilerOutputElement>> sortedOutput = groupOutputByPath(outputDataList);
+        
+        if(mode == ConsoleMode.DISABLED) {
+            return null;
+        }
         
         MessageConsole msgConsole = KotlinConsoleKt.createCleanKotlinConsole();
         for (List<CompilerOutputElement> outputList : sortedOutput.values()) {
             printCompilerOutputList(outputList, msgConsole);
         }
-        
-        if (status.getSeverity() == IStatus.ERROR) {
+                
+        if (mode == ConsoleMode.SHOW_ON_ERROR && status.getSeverity() == IStatus.ERROR) {
             ConsolePlugin.getDefault().getConsoleManager().showConsoleView(msgConsole);
         }
         
