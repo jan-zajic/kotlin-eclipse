@@ -28,6 +28,7 @@ class KotlinPreferenceInitializer : AbstractPreferenceInitializer() {
             setDefault(KotlinPluginUpdater.LAST_UPDATE_CHECK, 0L)
             setDefault(KotlinPluginUpdater.USER_ID, 0L)
 			setDefault(KotlinPreferencePage.SHOW_COMPILER_CONSOLE, ConsoleMode.DISABLED.name)
+			setDefault(EditorPreferencePage.MARK_OCCURRENCES, true)
         }
     }
 }

@@ -25,7 +25,7 @@ import org.jetbrains.kotlin.ui.Activator;
 
 public class KotlinPreferencePage extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
 
-    public static final String SHOW_COMPILER_CONSOLE = "kotlin.show.console";
+    public static final String SHOW_COMPILER_CONSOLE = "showConsole";
 
     public KotlinPreferencePage() {
     }

@@ -16,33 +16,44 @@
  *******************************************************************************/
 package org.jetbrains.kotlin.preferences;
 
-import org.eclipse.jface.preference.PreferencePage;
+import org.eclipse.jface.preference.BooleanFieldEditor;
+import org.eclipse.jface.preference.FieldEditorPreferencePage;
 import org.eclipse.jface.resource.ImageDescriptor;
-import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Control;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchPreferencePage;
+import org.jetbrains.kotlin.ui.Activator;
 
-public class EditorPreferencePage extends PreferencePage implements IWorkbenchPreferencePage {
+public class EditorPreferencePage extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
 
+    public static final String MARK_OCCURRENCES = "markOccurrences";
+    
     public EditorPreferencePage() {
+        super();
     }
 
-    public EditorPreferencePage(String title) {
-        super(title);
+    public EditorPreferencePage(int style) {
+        super(style);
     }
 
-    public EditorPreferencePage(String title, ImageDescriptor image) {
-        super(title, image);
+    public EditorPreferencePage(String title, ImageDescriptor image, int style) {
+        super(title, image, style);
+    }
+
+    public EditorPreferencePage(String title, int style) {
+        super(title, style);
     }
 
     @Override
     public void init(IWorkbench workbench) {
+        setPreferenceStore(Activator.getDefault().getPreferenceStore());
     }
 
     @Override
-    protected Control createContents(Composite parent) {
-        return null;
+    protected void createFieldEditors() {
+        BooleanFieldEditor consoleEditor = new BooleanFieldEditor(MARK_OCCURRENCES, "Mark Occurrences", getFieldEditorParent());
+        addField(consoleEditor);
     }
+
+
 
 }

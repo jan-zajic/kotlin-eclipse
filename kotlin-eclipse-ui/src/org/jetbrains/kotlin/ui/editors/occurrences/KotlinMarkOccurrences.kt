@@ -29,16 +29,17 @@ import org.eclipse.search.ui.text.Match
 import org.eclipse.ui.ISelectionListener
 import org.eclipse.ui.IWorkbenchPart
 import org.jetbrains.kotlin.core.builder.KotlinPsiManager
+import org.jetbrains.kotlin.core.model.runJob
 import org.jetbrains.kotlin.core.references.resolveToSourceDeclaration
 import org.jetbrains.kotlin.descriptors.SourceElement
 import org.jetbrains.kotlin.eclipse.ui.utils.EditorUtil
 import org.jetbrains.kotlin.eclipse.ui.utils.getTextDocumentOffset
-import org.jetbrains.kotlin.core.model.runJob
+import org.jetbrains.kotlin.preferences.EditorPreferencePage
 import org.jetbrains.kotlin.psi.KtElement
+import org.jetbrains.kotlin.ui.Activator
 import org.jetbrains.kotlin.ui.commands.findReferences.KotlinScopedQuerySpecification
 import org.jetbrains.kotlin.ui.editors.KotlinCommonEditor
 import org.jetbrains.kotlin.ui.editors.KotlinEditor
-import org.jetbrains.kotlin.ui.editors.KotlinFileEditor
 import org.jetbrains.kotlin.ui.editors.annotations.AnnotationManager
 import org.jetbrains.kotlin.ui.refactorings.rename.getLengthOfIdentifier
 import org.jetbrains.kotlin.ui.search.KotlinElementMatch
@@ -52,6 +53,11 @@ public class KotlinMarkOccurrences(val kotlinEditor: KotlinCommonEditor) : ISele
     
     override fun selectionChanged(part: IWorkbenchPart, selection: ISelection) {
         if (!kotlinEditor.isActive()) return
+		
+		val preferenceStore = Activator.getDefault().getPreferenceStore();
+        val markOccurences = preferenceStore.getBoolean(EditorPreferencePage.MARK_OCCURRENCES);
+		if(!markOccurences)
+			return;
         
         runJob("Update occurrence annotations", Job.DECORATE) { 
             if (part is KotlinCommonEditor && selection is ITextSelection) {
