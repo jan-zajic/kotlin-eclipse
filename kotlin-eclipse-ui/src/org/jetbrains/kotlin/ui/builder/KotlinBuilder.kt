@@ -26,10 +26,12 @@ import org.eclipse.core.resources.ResourcesPlugin
 import org.eclipse.core.runtime.IProgressMonitor
 import org.eclipse.core.runtime.Status
 import org.eclipse.core.runtime.jobs.Job
+import org.eclipse.core.runtime.preferences.InstanceScope
 import org.eclipse.debug.core.model.LaunchConfigurationDelegate
 import org.eclipse.jdt.core.IJavaProject
 import org.eclipse.jdt.core.JavaCore
 import org.eclipse.ui.PlatformUI
+import org.jetbrains.kotlin.core.CorePreferences
 import org.jetbrains.kotlin.core.asJava.KotlinLightClassGeneration
 import org.jetbrains.kotlin.core.builder.KotlinPsiManager
 import org.jetbrains.kotlin.core.compiler.KotlinCompiler.KotlinCompilerArguments
@@ -52,6 +54,8 @@ class KotlinBuilder : IncrementalProjectBuilder() {
     
     override fun build(kind: Int, args: Map<String, String>?, monitor: IProgressMonitor?): Array<IProject>? {
         val javaProject = JavaCore.create(project)
+		val corePrefs = InstanceScope.INSTANCE.getNode(org.jetbrains.kotlin.core.Activator.PLUGIN_ID);
+		
         if (isBuildingForLaunch()) {
             compileKotlinFiles(javaProject, KotlinCompilerArguments.run())
             return null
@@ -98,15 +102,14 @@ class KotlinBuilder : IncrementalProjectBuilder() {
         clearProblemAnnotationsFromOpenEditorsExcept(existingAffectedFiles)
         updateLineMarkers(analysisResultWithProvider.analysisResult.bindingContext.diagnostics, existingAffectedFiles)
         
+		val incrementalCompilation = corePrefs.getBoolean(CorePreferences.INCREMENTAL_COMPILATION, false)
+		
         runCancellableAnalysisFor(javaProject) { analysisResult ->
             val projectFiles = KotlinPsiManager.getFilesByProject(javaProject.project)
             updateLineMarkers(analysisResult.bindingContext.diagnostics, (projectFiles - existingAffectedFiles).toList())
-			if(!analysisResult.isError()) {
+			if(!analysisResult.isError() && incrementalCompilation) {
 				val cachesDir = getCachesDir(javaProject)				
-				val compilerResult = KotlinCompilerUtils.compileWholeProject(javaProject, KotlinCompilerArguments.incrementalBuild(cachesDir))
-		        if (!compilerResult.compiledCorrectly()) {
-		            KotlinCompilerUtils.handleCompilerOutput(compilerResult.getCompilerOutput())
-		        } 				
+				compileKotlinFiles(javaProject, KotlinCompilerArguments.incrementalBuild(cachesDir))
 			}
         }
         

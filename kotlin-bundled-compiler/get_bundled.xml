@@ -62,7 +62,7 @@
         
         <delete file="${testData.dir}/${test-data-file}}" />
     </target>
-    
+
     <target name="download_test_framework_dependencies">
         <mkdir dir="${testModule.lib}" />
         <delete includeemptydirs="true">
@@ -74,13 +74,12 @@
             dest="${testModule.lib}/gson-2.3.1.jar" 
             usetimestamp="true"/>
     </target>
-
+	
     <target name="download_bundled">
         <mkdir dir="${target.dir}" />
         <delete includeemptydirs="true">
             <fileset dir="${target.dir}" includes="**/*" excludes="${download.name}/*" />
         </delete>
-        
 
         <mkdir dir="${download.dir}" />
 
@@ -251,7 +250,19 @@
         </zip>
     </target>
     
-    <target name="get_bundled" depends="download_bundled, download_test_data,
+	<target name="download_dependencies">        
+        <get 
+            src="http://central.maven.org/maven2/org/jetbrains/kotlin/kotlin-compiler-client-embeddable/${kotlin-version}/kotlin-compiler-client-embeddable-${kotlin-version}.jar" 
+            dest="${target.dir}/kotlin-compiler-client.jar" 
+            usetimestamp="true"/>
+		
+		<get 
+            src="http://central.maven.org/maven2/org/jetbrains/kotlin/kotlin-compiler-client-embeddable/${kotlin-version}/kotlin-compiler-client-embeddable-${kotlin-version}-sources.jar" 
+            dest="${download.dir}/kotlin-compiler-client-sources.jar" 
+            usetimestamp="true"/>
+    </target>
+	
+    <target name="get_bundled" depends="download_bundled, download_dependencies, download_test_data,
         download_test_framework_dependencies, refresh_eclipse">
     </target>
 </project>

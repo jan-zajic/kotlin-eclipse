@@ -17,9 +17,9 @@
 package org.jetbrains.kotlin.preferences
 
 import org.eclipse.core.runtime.preferences.AbstractPreferenceInitializer
+import org.jetbrains.kotlin.core.CorePreferences
 import org.jetbrains.kotlin.ui.Activator
 import org.jetbrains.kotlin.ui.KotlinPluginUpdater
-import java.util.Random
 
 class KotlinPreferenceInitializer : AbstractPreferenceInitializer() {
     override fun initializeDefaultPreferences() {
@@ -29,6 +29,8 @@ class KotlinPreferenceInitializer : AbstractPreferenceInitializer() {
             setDefault(KotlinPluginUpdater.USER_ID, 0L)
 			setDefault(KotlinPreferencePage.SHOW_COMPILER_CONSOLE, ConsoleMode.DISABLED.name)
 			setDefault(EditorPreferencePage.MARK_OCCURRENCES, true)
+			setDefault(CorePreferences.INCREMENTAL_COMPILATION, true)
+			setDefault(CorePreferences.BUILD_DAEMON, false)
         }
     }
 }

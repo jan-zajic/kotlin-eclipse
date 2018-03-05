@@ -16,33 +16,45 @@
  *******************************************************************************/
 package org.jetbrains.kotlin.preferences;
 
-import org.eclipse.jface.preference.PreferencePage;
+import org.eclipse.core.runtime.preferences.InstanceScope;
+import org.eclipse.jface.preference.BooleanFieldEditor;
+import org.eclipse.jface.preference.FieldEditorPreferencePage;
 import org.eclipse.jface.resource.ImageDescriptor;
-import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Control;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchPreferencePage;
+import org.eclipse.ui.preferences.ScopedPreferenceStore;
+import org.jetbrains.kotlin.core.CorePreferences;
 
-public class CompilerPreferencePage extends PreferencePage implements IWorkbenchPreferencePage {
-
+public class CompilerPreferencePage extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
+    
     public CompilerPreferencePage() {
+        super();
     }
 
-    public CompilerPreferencePage(String title) {
-        super(title);
+    public CompilerPreferencePage(int style) {
+        super(style);
     }
 
-    public CompilerPreferencePage(String title, ImageDescriptor image) {
-        super(title, image);
+    public CompilerPreferencePage(String title, ImageDescriptor image, int style) {
+        super(title, image, style);
+    }
+
+    public CompilerPreferencePage(String title, int style) {
+        super(title, style);
     }
 
     @Override
     public void init(IWorkbench workbench) {
+        // Set the preference store for the preference page.
+        setPreferenceStore(new ScopedPreferenceStore(InstanceScope.INSTANCE, org.jetbrains.kotlin.core.Activator.PLUGIN_ID));
     }
 
     @Override
-    protected Control createContents(Composite parent) {
-        return null;
+    protected void createFieldEditors() {
+        BooleanFieldEditor incrementalCompilation = new BooleanFieldEditor(CorePreferences.INCREMENTAL_COMPILATION, "Incremental compilation", getFieldEditorParent());
+        addField(incrementalCompilation);
+        BooleanFieldEditor buildServer = new BooleanFieldEditor(CorePreferences.BUILD_DAEMON, "Use build daemon", getFieldEditorParent());
+        addField(buildServer);
     }
-
+    
 }
