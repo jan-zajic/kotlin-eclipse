@@ -41,6 +41,7 @@ import org.jetbrains.kotlin.core.model.KotlinScriptEnvironment
 import org.jetbrains.kotlin.core.model.runJob
 import org.jetbrains.kotlin.core.resolve.KotlinAnalyzer
 import org.jetbrains.kotlin.core.resolve.lang.java.structure.EclipseJavaElementUtil
+import org.jetbrains.kotlin.core.utils.ProjectUtils
 import org.jetbrains.kotlin.eclipse.ui.utils.EditorUtil
 import org.jetbrains.kotlin.resolve.diagnostics.Diagnostics
 import org.jetbrains.kotlin.ui.KotlinPluginUpdater
@@ -108,7 +109,7 @@ class KotlinBuilder : IncrementalProjectBuilder() {
             val projectFiles = KotlinPsiManager.getFilesByProject(javaProject.project)
             updateLineMarkers(analysisResult.bindingContext.diagnostics, (projectFiles - existingAffectedFiles).toList())
 			if(!analysisResult.isError() && incrementalCompilation) {
-				val cachesDir = getCachesDir(javaProject)				
+				val cachesDir = getCachesDir(javaProject, true)				
 				compileKotlinFiles(javaProject, KotlinCompilerArguments.incrementalBuild(cachesDir))
 			}
         }
@@ -116,9 +117,9 @@ class KotlinBuilder : IncrementalProjectBuilder() {
         return null
     }
     
-	private fun getCachesDir(javaProject: IJavaProject) : java.io.File {
+	private fun getCachesDir(javaProject: IJavaProject, createIfNotExists : Boolean) : java.io.File {
 		val ifile = KotlinJavaManager.getKotlinCacheFolderFor(javaProject.getProject());
-		if(!ifile.exists()) {
+		if(!ifile.exists() && createIfNotExists) {
 			ifile.create(false, true, null)
 		}
 		return ifile.getLocation().toFile();
@@ -148,6 +149,8 @@ class KotlinBuilder : IncrementalProjectBuilder() {
         clearProblemAnnotationsFromOpenEditorsExcept(emptyList())
         clearMarkersFromFiles(existingFiles)
 		KotlinLightClassGeneration.cleanLightClasses(javaProject.getProject())
+		
+		ProjectUtils.cleanFolder(KotlinJavaManager.getKotlinCacheFolderFor(javaProject.getProject()))
     }
     
     private fun fullBuild(javaProject: IJavaProject, monitor: IProgressMonitor?) {
