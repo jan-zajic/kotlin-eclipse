@@ -52,8 +52,10 @@ public class Activator extends Plugin {
 		ResourcesPlugin.getWorkspace().addResourceChangeListener(KotlinRefreshProjectListener.INSTANCE,
 		        IResourceChangeEvent.PRE_REFRESH);
 		boolean startBuildDaemon = corePreferences.getBoolean(CorePreferences.BUILD_DAEMON, false);
+		boolean extDaemon = corePreferences.getBoolean(CorePreferences.EXTERNAL_DAEMON_PROCESS, false);
+		
 		if(startBuildDaemon)
-		    EclipseKotlinCompilerDaemon.INSTANCE.start();
+		    EclipseKotlinCompilerDaemon.INSTANCE.start(extDaemon);
 	}
 
 	@Override

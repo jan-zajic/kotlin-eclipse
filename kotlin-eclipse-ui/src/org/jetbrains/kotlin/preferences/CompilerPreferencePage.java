@@ -53,8 +53,10 @@ public class CompilerPreferencePage extends FieldEditorPreferencePage implements
     protected void createFieldEditors() {
         BooleanFieldEditor incrementalCompilation = new BooleanFieldEditor(CorePreferences.INCREMENTAL_COMPILATION, "Incremental compilation", getFieldEditorParent());
         addField(incrementalCompilation);
-        BooleanFieldEditor buildServer = new BooleanFieldEditor(CorePreferences.BUILD_DAEMON, "Use build daemon", getFieldEditorParent());
-        addField(buildServer);
+        BooleanFieldEditor buildDaemon = new BooleanFieldEditor(CorePreferences.BUILD_DAEMON, "Use build daemon", getFieldEditorParent());
+        addField(buildDaemon);
+        BooleanFieldEditor externalDaemon = new BooleanFieldEditor(CorePreferences.EXTERNAL_DAEMON_PROCESS, "External Daemon process", getFieldEditorParent());
+        addField(externalDaemon);
     }
     
 }

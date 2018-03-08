@@ -26,6 +26,12 @@
       </filesystem>
    </extension>
    <extension
+         point="org.eclipse.core.runtime.preferences">
+      <initializer
+            class="org.jetbrains.kotlin.core.KotlinCorePreferenceInitializer">
+      </initializer>
+   </extension>
+   <extension
          point="org.eclipse.jdt.core.classpathContainerInitializer">
       <classpathContainerInitializer
             class="org.jetbrains.kotlin.core.KotlinClasspathContainerInitializer"
